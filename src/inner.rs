@@ -695,8 +695,6 @@ mod model {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
 
-    use crate::settings::Settings;
-
     #[derive(Resource)]
     pub struct CardGameModel {
         pub demons: Demons,
@@ -709,20 +707,20 @@ mod model {
     }
 
     impl CardGameModel {
-        pub fn new(starter_cards: Vec<CardKind>, settings: &Settings) -> Self {
+        pub fn new(starter_cards: Vec<CardKind>) -> Self {
             let mut card_game_model = CardGameModel {
                 demons: Demons {
                     fear: Demon {
-                        power: settings.game.inner.starting_demon_power,
-                        stun_time: settings.game.inner.starting_demon_stun_time,
+                        power: 5,
+                        stun_time: 0,
                     },
                     despair: Demon {
-                        power: settings.game.inner.starting_demon_power,
-                        stun_time: settings.game.inner.starting_demon_stun_time,
+                        power: 5,
+                        stun_time: 0,
                     },
                     doubt: Demon {
-                        power: settings.game.inner.starting_demon_power,
-                        stun_time: settings.game.inner.starting_demon_stun_time,
+                        power: 5,
+                        stun_time: 0,
                     },
                 },
                 player_stats: PlayerStats {
@@ -904,22 +902,19 @@ mod model {
         }
     }
 
-    pub fn setup(mut commands: Commands, settings: Res<Settings>) {
-        let card_game_model = CardGameModel::new(
-            vec![
-                CardKind::Inspired,
-                CardKind::Inspired,
-                CardKind::Inspired,
-                CardKind::Peaceful,
-                CardKind::Peaceful,
-                CardKind::Peaceful,
-                CardKind::Peaceful,
-                CardKind::Peaceful,
-                CardKind::Peaceful,
-                CardKind::Peaceful,
-            ],
-            &settings,
-        );
+    pub fn setup(mut commands: Commands) {
+        let card_game_model = CardGameModel::new(vec![
+            CardKind::Inspired,
+            CardKind::Inspired,
+            CardKind::Inspired,
+            CardKind::Peaceful,
+            CardKind::Peaceful,
+            CardKind::Peaceful,
+            CardKind::Peaceful,
+            CardKind::Peaceful,
+            CardKind::Peaceful,
+            CardKind::Peaceful,
+        ]);
         commands.insert_resource(card_game_model);
     }
 
