@@ -35,6 +35,14 @@ jobs:
 
       - name: Prepare package
         run: |
+          echo "current dir"
+          ls .
+          echo "target dir"
+          ls target/
+          echo "wasm dir"
+          ls target/wasm32-unknown-unknown/
+          echo "release dir"
+          ls target/wasm32-unknown-unknown/release
           wasm-bindgen --no-typescript --out-name bevy_game --out-dir wasm --target web target/wasm32-unknown-unknown/release/${{ env.binary }}.wasm
           cp -r assets wasm/
 
