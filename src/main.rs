@@ -1,10 +1,9 @@
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
-use bevy::prelude::*;
-use bevy::render::camera::ScalingMode;
-use inner::CardGamePlugin;
+mod game;
 
-mod inner;
+use bevy::prelude::*;
+use game::GamePlugin;
 
 fn main() {
     App::new()
@@ -20,23 +19,6 @@ fn main() {
         }))
         // .add_startup_system(debug_setup)
         // .add_system(spawn_player)
-        .add_plugin(CardGamePlugin)
+        .add_plugin(GamePlugin)
         .run();
 }
-
-// fn debug_setup(mut commands: Commands) {
-//     let mut camera_bundle = Camera2dBundle::default();
-//     camera_bundle.projection.scaling_mode = ScalingMode::FixedVertical(10.);
-//     commands.spawn(camera_bundle);
-// }
-
-// fn spawn_player(mut commands: Commands) {
-//     commands.spawn(SpriteBundle {
-//         sprite: Sprite {
-//             color: Color::rgb(0., 0.47, 1.),
-//             custom_size: Some(Vec2::new(1., 1.)),
-//             ..default()
-//         },
-//         ..default()
-//     });
-// }
