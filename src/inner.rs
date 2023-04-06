@@ -9,9 +9,22 @@ impl Plugin for CardGamePlugin {
             .add_system(view::hand_card_interaction)
             .add_system(view::end_turn_btn_interaction)
             .add_system(
-                view::refresh_from_model
+                view::clear_hand_and_play_area
                     .after(view::hand_card_interaction)
                     .after(view::end_turn_btn_interaction),
+            )
+            .add_systems(
+                (
+                    view::refresh_hand,
+                    view::refresh_deck,
+                    view::refresh_play_area,
+                    view::refresh_discard_pile,
+                    view::refresh_bravery,
+                    view::refresh_hope,
+                    view::refresh_confidence,
+                    view::cleanup_dead_cards,
+                )
+                    .after(view::clear_hand_and_play_area),
             );
     }
 }
@@ -308,7 +321,7 @@ mod view {
                                 "Bravery: ",
                                 TextStyle {
                                     font: font_handles.regular.clone(),
-                                    font_size: 16.0,
+                                    font_size: 20.0,
                                     color: Color::WHITE,
                                 },
                             ),
@@ -316,7 +329,7 @@ mod view {
                                 "0",
                                 TextStyle {
                                     font: font_handles.regular.clone(),
-                                    font_size: 16.0,
+                                    font_size: 20.0,
                                     color: Color::CYAN,
                                 },
                             ),
@@ -330,7 +343,7 @@ mod view {
                                 "Hope: ",
                                 TextStyle {
                                     font: font_handles.regular.clone(),
-                                    font_size: 16.0,
+                                    font_size: 20.0,
                                     color: Color::WHITE,
                                 },
                             ),
@@ -338,7 +351,7 @@ mod view {
                                 "0",
                                 TextStyle {
                                     font: font_handles.regular.clone(),
-                                    font_size: 16.0,
+                                    font_size: 20.0,
                                     color: Color::CYAN,
                                 },
                             ),
@@ -352,7 +365,7 @@ mod view {
                                 "Confidence: ",
                                 TextStyle {
                                     font: font_handles.regular.clone(),
-                                    font_size: 16.0,
+                                    font_size: 20.0,
                                     color: Color::WHITE,
                                 },
                             ),
@@ -360,7 +373,7 @@ mod view {
                                 "0",
                                 TextStyle {
                                     font: font_handles.regular.clone(),
-                                    font_size: 16.0,
+                                    font_size: 20.0,
                                     color: Color::CYAN,
                                 },
                             ),
@@ -450,19 +463,19 @@ mod view {
         }
     }
 
-    pub fn refresh_from_model(
+    pub fn clear_hand_and_play_area(
         mut commands: Commands,
         mut q_hand_area: Query<Entity, With<HandArea>>,
         mut q_play_area: Query<Entity, With<PlayArea>>,
-        mut q_deck_top_visibility: Query<&mut Visibility, (With<DeckTop>, Without<DiscardTop>)>,
-        mut q_disc_top: Query<
-            (&mut Visibility, &mut UiImage),
-            (Without<DeckTop>, With<DiscardTop>),
-        >,
-        mut q_bravery_val: Query<&mut Text, With<BraveryValue>>,
-        mut q_hope_val: Query<&mut Text, With<HopeValue>>,
-        mut q_confidence_val: Query<&mut Text, With<BraveryValue>>,
-        mut q_cards: Query<(Entity, &Card, &mut UiImage), (Without<DeckTop>, Without<DiscardTop>)>,
+    ) {
+        commands.entity(q_hand_area.single_mut()).clear_children();
+        commands.entity(q_play_area.single_mut()).clear_children();
+    }
+
+    pub fn refresh_hand(
+        mut commands: Commands,
+        mut q_hand_area: Query<Entity, With<HandArea>>,
+        mut q_cards: Query<(Entity, &Card, &mut UiImage)>,
         image_handles: Res<ImageHandles>,
         game_model: Res<model::CardGameModel>,
     ) {
@@ -475,48 +488,65 @@ mod view {
             image.texture = card.image_handles.face_up.clone();
         }
 
-        // Clear all card areas of their children
-        commands.entity(q_hand_area.single_mut()).clear_children();
-        commands.entity(q_play_area.single_mut()).clear_children();
+        // Update the hand
+        let mut hand_area = commands.entity(q_hand_area.single_mut());
+        for card in game_model.hand.iter() {
+            match visible_cards.get(&card.id) {
+                Some(entity) => {
+                    // Set card's parent as the hand area
+                    hand_area.push_children(&[*entity]);
+                }
+                None => {
+                    // Spawn a new card object
+                    hand_area.with_children(|parent| {
+                        let new_card_obj = create_card(card.clone(), &image_handles);
+                        parent.spawn(new_card_obj);
+                    });
+                }
+            }
+        }
+    }
 
-        {
-            // Update the hand
-            let mut hand_area = commands.entity(q_hand_area.single_mut());
-            for card in game_model.hand.iter() {
-                match visible_cards.get(&card.id) {
-                    Some(entity) => {
-                        // Set card's parent as the hand area
-                        hand_area.push_children(&[*entity]);
-                    }
-                    None => {
-                        // Spawn a new card object
-                        hand_area.with_children(|parent| {
-                            let new_card_obj = create_card(card.clone(), &image_handles);
-                            parent.spawn(new_card_obj);
-                        });
-                    }
+    pub fn refresh_play_area(
+        mut commands: Commands,
+        mut q_play_area: Query<Entity, With<PlayArea>>,
+        mut q_cards: Query<(Entity, &Card, &mut UiImage)>,
+        image_handles: Res<ImageHandles>,
+        game_model: Res<model::CardGameModel>,
+    ) {
+        // Catalog the card objects that already exist in the scene
+        // to avoid despawning and creating them every frame
+        let mut visible_cards: HashMap<u32, Entity> = HashMap::new();
+        for (entity, card, mut image) in q_cards.iter_mut() {
+            visible_cards.insert(card.model.id, entity);
+            // Also make sure all cards are face up
+            image.texture = card.image_handles.face_up.clone();
+        }
+
+        commands.entity(q_play_area.single_mut()).clear_children();
+        // Update the play area
+        let mut play_area = commands.entity(q_play_area.single_mut());
+        for card in game_model.in_play.iter() {
+            match visible_cards.get(&card.id) {
+                Some(entity) => {
+                    // Set card's parent as the hand area
+                    play_area.push_children(&[*entity]);
+                }
+                None => {
+                    // Spawn a new card object
+                    play_area.with_children(|parent| {
+                        let new_card_obj = create_card(card.clone(), &image_handles);
+                        parent.spawn(new_card_obj);
+                    });
                 }
             }
         }
-        {
-            // Update the play area
-            let mut play_area = commands.entity(q_play_area.single_mut());
-            for card in game_model.in_play.iter() {
-                match visible_cards.get(&card.id) {
-                    Some(entity) => {
-                        // Set card's parent as the hand area
-                        play_area.push_children(&[*entity]);
-                    }
-                    None => {
-                        // Spawn a new card object
-                        play_area.with_children(|parent| {
-                            let new_card_obj = create_card(card.clone(), &image_handles);
-                            parent.spawn(new_card_obj);
-                        });
-                    }
-                }
-            }
-        }
+    }
+
+    pub fn refresh_deck(
+        mut q_deck_top_visibility: Query<&mut Visibility, (With<DeckTop>, Without<DiscardTop>)>,
+        game_model: Res<model::CardGameModel>,
+    ) {
         // Update the deck
         let mut deck_top_visibility = q_deck_top_visibility.single_mut();
         if game_model.deck.is_empty() {
@@ -524,7 +554,16 @@ mod view {
         } else {
             *deck_top_visibility = Visibility::Visible;
         }
+    }
 
+    pub fn refresh_discard_pile(
+        mut q_disc_top: Query<
+            (&mut Visibility, &mut UiImage),
+            (Without<DeckTop>, With<DiscardTop>),
+        >,
+        image_handles: Res<ImageHandles>,
+        game_model: Res<model::CardGameModel>,
+    ) {
         // Update the discard pile
         let (mut disc_top_visibility, mut disc_top_image) = q_disc_top.single_mut();
         if game_model.discard_pile.is_empty() {
@@ -541,27 +580,54 @@ mod view {
                 }
             }
         }
+    }
 
-        {
-            // Clean up cards in either the deck or discard pile
-            for (card_entity, card, _) in q_cards.iter() {
-                if game_model
-                    .deck
+    pub fn cleanup_dead_cards(
+        mut commands: Commands,
+        game_model: Res<model::CardGameModel>,
+        q_cards: Query<(Entity, &Card, &mut UiImage)>,
+    ) {
+        // Clean up cards in either the deck or discard pile
+        for (card_entity, card, _) in q_cards.iter() {
+            if game_model
+                .deck
+                .iter()
+                .find(|c| c.id == card.model.id)
+                .is_some()
+                || game_model
+                    .discard_pile
                     .iter()
                     .find(|c| c.id == card.model.id)
                     .is_some()
-                    || game_model
-                        .discard_pile
-                        .iter()
-                        .find(|c| c.id == card.model.id)
-                        .is_some()
-                {
-                    commands.entity(card_entity).despawn_recursive();
-                }
+            {
+                commands.entity(card_entity).despawn_recursive();
             }
         }
+    }
 
+    pub fn refresh_bravery(
+        mut q_bravery_val: Query<&mut Text, With<BraveryValue>>,
+        game_model: Res<model::CardGameModel>,
+    ) {
         // Update the HUD
+        let mut bravery_ui = q_bravery_val.single_mut();
+        bravery_ui.sections[1].value = game_model.player_stats.bravery.to_string();
+    }
+
+    pub fn refresh_hope(
+        mut q_hope_val: Query<&mut Text, With<HopeValue>>,
+        game_model: Res<model::CardGameModel>,
+    ) {
+        let mut hope_ui = q_hope_val.single_mut();
+        hope_ui.sections[1].value = game_model.player_stats.hope.to_string();
+    }
+
+    pub fn refresh_confidence(
+        mut q_confidence_val: Query<&mut Text, With<ConfidenceValue>>,
+        game_model: Res<model::CardGameModel>,
+    ) {
+        let mut confidence_ui = q_confidence_val.single_mut();
+        confidence_ui.sections[1].value = game_model.player_stats.confidence.to_string();
     }
 
     pub fn hand_card_interaction(
@@ -667,7 +733,7 @@ mod model {
                 },
                 deck: starter_cards
                     .iter()
-                    .zip((0..))
+                    .zip(0..)
                     .map(|(kind, id)| Card { id, kind: *kind })
                     .collect(),
                 discard_pile: Vec::new(),
@@ -696,8 +762,8 @@ mod model {
             // Find the index of the card with the given card_id
             self.hand
                 .iter()
-                .zip((0..))
-                .find(|(c, i)| c.id == card_id)
+                .zip(0..)
+                .find(|(c, _)| c.id == card_id)
                 .unwrap()
                 .1
         }
@@ -715,11 +781,6 @@ mod model {
             };
             self.discard_pile.push(card);
             self.next_card_id += 1;
-        }
-
-        pub fn trash(&mut self, card_id: u32) {
-            let card_index = self.find_card_in_hand(card_id);
-            let card = self.hand.remove(card_index);
         }
 
         pub fn play(&mut self, card_id: u32) {
@@ -898,9 +959,9 @@ mod model {
     }
 
     pub struct PlayerStats {
-        resolve: u32,
-        bravery: u32,
-        hope: u32,
-        confidence: u32,
+        pub resolve: u32,
+        pub bravery: u32,
+        pub hope: u32,
+        pub confidence: u32,
     }
 }
