@@ -82,6 +82,15 @@ mod view {
     pub struct HudArea1;
 
     #[derive(Component)]
+    pub struct BraveryValue;
+
+    #[derive(Component)]
+    pub struct HopeValue;
+
+    #[derive(Component)]
+    pub struct ConfidenceValue;
+
+    #[derive(Component)]
     pub struct HudArea2;
 
     #[derive(Component)]
@@ -286,10 +295,79 @@ mod view {
                 root.spawn(NodeBundle {
                     style: Style {
                         size: Size::height(Val::Px(30.0)),
+                        justify_content: JustifyContent::SpaceBetween,
                         ..default()
                     },
                     background_color: Color::rgb(0.3, 0.1, 0.7).into(),
                     ..default()
+                })
+                .with_children(|hud1| {
+                    hud1.spawn(TextBundle {
+                        text: Text::from_sections([
+                            TextSection::new(
+                                "Bravery: ",
+                                TextStyle {
+                                    font: font_handles.regular.clone(),
+                                    font_size: 16.0,
+                                    color: Color::WHITE,
+                                },
+                            ),
+                            TextSection::new(
+                                "0",
+                                TextStyle {
+                                    font: font_handles.regular.clone(),
+                                    font_size: 16.0,
+                                    color: Color::CYAN,
+                                },
+                            ),
+                        ]),
+                        ..default()
+                    })
+                    .insert(BraveryValue);
+                    hud1.spawn(TextBundle {
+                        text: Text::from_sections([
+                            TextSection::new(
+                                "Hope: ",
+                                TextStyle {
+                                    font: font_handles.regular.clone(),
+                                    font_size: 16.0,
+                                    color: Color::WHITE,
+                                },
+                            ),
+                            TextSection::new(
+                                "0",
+                                TextStyle {
+                                    font: font_handles.regular.clone(),
+                                    font_size: 16.0,
+                                    color: Color::CYAN,
+                                },
+                            ),
+                        ]),
+                        ..default()
+                    })
+                    .insert(HopeValue);
+                    hud1.spawn(TextBundle {
+                        text: Text::from_sections([
+                            TextSection::new(
+                                "Confidence: ",
+                                TextStyle {
+                                    font: font_handles.regular.clone(),
+                                    font_size: 16.0,
+                                    color: Color::WHITE,
+                                },
+                            ),
+                            TextSection::new(
+                                "0",
+                                TextStyle {
+                                    font: font_handles.regular.clone(),
+                                    font_size: 16.0,
+                                    color: Color::CYAN,
+                                },
+                            ),
+                        ]),
+                        ..default()
+                    })
+                    .insert(ConfidenceValue);
                 })
                 .insert(HudArea1);
                 // Play area
@@ -319,7 +397,6 @@ mod view {
                             size: Size::width(Val::Px(120.0)),
                             margin: UiRect {
                                 left: Val::Px(5.0),
-                                top: Val::Px(5.0),
                                 ..default()
                             },
                             ..default()
@@ -359,6 +436,7 @@ mod view {
                     size: Size::new(Val::Px(128.0), Val::Px(144.0)),
                     margin: UiRect {
                         left: Val::Px(5.0),
+                        top: Val::Px(5.0),
                         ..default()
                     },
                     ..default()
@@ -381,6 +459,9 @@ mod view {
             (&mut Visibility, &mut UiImage),
             (Without<DeckTop>, With<DiscardTop>),
         >,
+        mut q_bravery_val: Query<&mut Text, With<BraveryValue>>,
+        mut q_hope_val: Query<&mut Text, With<HopeValue>>,
+        mut q_confidence_val: Query<&mut Text, With<BraveryValue>>,
         mut q_cards: Query<(Entity, &Card, &mut UiImage), (Without<DeckTop>, Without<DiscardTop>)>,
         image_handles: Res<ImageHandles>,
         game_model: Res<model::CardGameModel>,
@@ -479,6 +560,8 @@ mod view {
                 }
             }
         }
+
+        // Update the HUD
     }
 
     pub fn hand_card_interaction(

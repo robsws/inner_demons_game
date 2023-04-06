@@ -1,22 +1,27 @@
-// Bevy code commonly triggers these lints and they may be important signals
-// about code quality. They are sometimes hard to avoid though, and the CI
-// workflow treats them as errors, so this allows them throughout the project.
-// Feel free to delete this line.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 use bevy::prelude::*;
+use inner::CardGamePlugin;
+
+mod inner;
+mod settings;
+
+use settings::Settings;
 
 fn main() {
+    let settings = Settings::from_config();
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_startup_system(setup)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Inner Demons".into(),
+                resolution: (settings.window.width, settings.window.height).into(),
+                fit_canvas_to_parent: true,
+                prevent_default_event_handling: false,
+                ..default()
+            }),
+            ..default()
+        }))
+        .insert_resource(settings)
+        .add_plugin(CardGamePlugin)
         .run();
-}
-
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(Camera2dBundle::default());
-    commands.spawn(SpriteBundle {
-        texture: asset_server.load("icon.png"),
-        ..Default::default()
-    });
 }
