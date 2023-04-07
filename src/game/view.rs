@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
-use super::{dungeon_model, model};
+use super::{
+    dungeon_model,
+    model::{self, CardKind},
+};
 
 #[derive(Resource, Clone)]
 pub struct ImageHandles {
@@ -100,35 +103,42 @@ pub struct DodgeValue;
 #[derive(Component)]
 pub struct ResolveValue;
 
+#[derive(Resource)]
+pub struct CardText {
+    lookup: HashMap<CardKind, String>,
+}
+
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Load images
     let img_card_back = asset_server.load("images/Card Back.png");
     let img_card_inspired = asset_server.load("images/Inspired.png");
-    let img_card_inspired_hover = asset_server.load("images/Card Back.png");
+    let img_card_inspired_hover = asset_server.load("images/InspiredHover.png");
     let img_card_peaceful = asset_server.load("images/Peaceful.png");
-    let img_card_peaceful_hover = asset_server.load("images/Card Back.png");
+    let img_card_peaceful_hover = asset_server.load("images/PeacefulHover.png");
     let img_card_dizzy = asset_server.load("images/Dizzy.png");
-    let img_card_dizzy_hover = asset_server.load("images/Card Back.png");
+    let img_card_dizzy_hover = asset_server.load("images/DizzyHover.png");
     let img_card_determined = asset_server.load("images/Determined.png");
-    let img_card_determined_hover = asset_server.load("images/Card Back.png");
+    let img_card_determined_hover = asset_server.load("images/DeterminedHover.png");
     let img_card_proud = asset_server.load("images/Proud.png");
-    let img_card_proud_hover = asset_server.load("images/Card Back.png");
+    let img_card_proud_hover = asset_server.load("images/ProudHover.png");
     let img_card_satisfied = asset_server.load("images/Satisfied.png");
-    let img_card_satisfied_hover = asset_server.load("images/Card Back.png");
+    let img_card_satisfied_hover = asset_server.load("images/SatisfiedHover.png");
     let img_card_angry = asset_server.load("images/Anger.png");
-    let img_card_angry_hover = asset_server.load("images/Card Back.png");
+    let img_card_angry_hover = asset_server.load("images/AngerHover.png");
     let img_card_stressed = asset_server.load("images/Stressed.png");
-    let img_card_stressed_hover = asset_server.load("images/Card Back.png");
+    let img_card_stressed_hover = asset_server.load("images/StressedHover.png");
     let img_card_tired = asset_server.load("images/Tired.png");
-    let img_card_tired_hover = asset_server.load("images/Card Back.png");
+    let img_card_tired_hover = asset_server.load("images/TiredHover.png");
     let img_card_hopeless = asset_server.load("images/Hopeless.png");
-    let img_card_hopeless_hover = asset_server.load("images/Card Back.png");
+    let img_card_hopeless_hover = asset_server.load("images/HopelessHover.png");
     let img_card_scared = asset_server.load("images/Scared.png");
-    let img_card_scared_hover = asset_server.load("images/Card Back.png");
+    let img_card_scared_hover = asset_server.load("images/ScaredHover.png");
     let img_card_shameful = asset_server.load("images/Shameful.png");
-    let img_card_shameful_hover = asset_server.load("images/Card Back.png");
+    let img_card_shameful_hover = asset_server.load("images/ShamefulHover.png");
     let img_btn_end_turn = asset_server.load("images/end_turn_btn.png");
     let img_btn_end_turn_hover = asset_server.load("images/end_turn_btn_hover.png");
+
+    // Add card text
 
     // Initialise card image handles
     let mut card_image_handles = HashMap::new();
@@ -744,26 +754,28 @@ pub fn clear_hand_and_play_area(
 pub fn refresh_hand(
     mut commands: Commands,
     mut q_hand_area: Query<Entity, With<HandArea>>,
-    mut q_cards: Query<(Entity, &Card, &mut UiImage)>,
+    mut q_cards: Query<(Entity, &Parent, &Card, &mut UiImage)>,
     image_handles: Res<ImageHandles>,
     game_model: Res<model::CardGameModel>,
 ) {
     // Catalog the card objects that already exist in the scene
     // to avoid despawning and creating them every frame
-    let mut visible_cards: HashMap<u32, Entity> = HashMap::new();
-    for (entity, card, mut image) in q_cards.iter_mut() {
-        visible_cards.insert(card.model.id, entity);
-        // Also make sure all cards are face up
-        image.texture = card.image_handles.face_up.clone();
+    let mut visible_cards: HashMap<u32, (Entity, Entity)> = HashMap::new();
+    for (entity, parent, card, mut image) in q_cards.iter_mut() {
+        visible_cards.insert(card.model.id, (entity, parent.get()));
     }
 
     // Update the hand
-    let mut hand_area = commands.entity(q_hand_area.single_mut());
+    let e_hand_area = q_hand_area.single_mut();
+    let mut hand_area = commands.entity(e_hand_area);
     for card in game_model.hand.iter() {
         match visible_cards.get(&card.id) {
-            Some(entity) => {
-                // Set card's parent as the hand area
-                hand_area.push_children(&[*entity]);
+            Some((entity, parent)) => {
+                if *parent != e_hand_area {
+                    println!("setting parent");
+                    // Set card's parent as the hand area
+                    hand_area.push_children(&[*entity]);
+                }
             }
             None => {
                 // Spawn a new card object
@@ -779,6 +791,7 @@ pub fn refresh_hand(
 pub fn refresh_play_area(
     mut commands: Commands,
     mut q_play_area: Query<Entity, With<PlayArea>>,
+    q_play_area_children: Query<&Children, With<PlayArea>>,
     mut q_cards: Query<(Entity, &Card, &mut UiImage)>,
     image_handles: Res<ImageHandles>,
     game_model: Res<model::CardGameModel>,
@@ -786,19 +799,19 @@ pub fn refresh_play_area(
     // Catalog the card objects that already exist in the scene
     // to avoid despawning and creating them every frame
     let mut visible_cards: HashMap<u32, Entity> = HashMap::new();
-    for (entity, card, mut image) in q_cards.iter_mut() {
+    for (entity, card, _) in q_cards.iter_mut() {
         visible_cards.insert(card.model.id, entity);
-        // Also make sure all cards are face up
-        image.texture = card.image_handles.face_up.clone();
     }
 
-    commands.entity(q_play_area.single_mut()).clear_children();
+    let e_play_area = q_play_area.single_mut();
+    commands.entity(e_play_area).clear_children();
+
     // Update the play area
-    let mut play_area = commands.entity(q_play_area.single_mut());
+    let mut play_area = commands.entity(e_play_area);
     for card in game_model.in_play.iter() {
         match visible_cards.get(&card.id) {
             Some(entity) => {
-                // Set card's parent as the hand area
+                // Set card's parent as the play area
                 play_area.push_children(&[*entity]);
             }
             None => {
@@ -810,10 +823,18 @@ pub fn refresh_play_area(
             }
         }
     }
+
+    // Make play area cards face up
+    for children in q_play_area_children.iter() {
+        for child in children.iter() {
+            let (entity, card, mut image) = q_cards.get_mut(*child).unwrap();
+            image.texture = card.image_handles.face_up.clone();
+        }
+    }
 }
 
 pub fn refresh_deck(
-    mut q_deck_top_visibility: Query<&mut Visibility, (With<DeckTop>, Without<DiscardTop>)>,
+    mut q_deck_top_visibility: Query<&mut Visibility, With<DeckTop>>,
     game_model: Res<model::CardGameModel>,
 ) {
     // Update the deck
@@ -826,7 +847,7 @@ pub fn refresh_deck(
 }
 
 pub fn refresh_discard_pile(
-    mut q_disc_top: Query<(&mut Visibility, &mut UiImage), (Without<DeckTop>, With<DiscardTop>)>,
+    mut q_disc_top: Query<(&mut Visibility, &mut UiImage), With<DiscardTop>>,
     image_handles: Res<ImageHandles>,
     game_model: Res<model::CardGameModel>,
 ) {
@@ -988,8 +1009,12 @@ pub fn hand_card_interaction(
                         Interaction::Clicked => {
                             game_model.play(card.model.id, &mut dungeon_model);
                         }
-                        Interaction::Hovered => image.texture = card.image_handles.hover.clone(),
-                        Interaction::None => image.texture = card.image_handles.face_up.clone(),
+                        Interaction::Hovered => {
+                            image.texture = card.image_handles.hover.clone();
+                        }
+                        Interaction::None => {
+                            image.texture = card.image_handles.face_up.clone();
+                        }
                     },
                     _ => (),
                 }

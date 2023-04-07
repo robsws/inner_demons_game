@@ -13,13 +13,6 @@ impl Plugin for GamePlugin {
             .add_startup_system(dungeon_model::setup)
             .add_startup_system(view::setup)
             .add_startup_system(dungeon_view::setup)
-            .add_system(view::hand_card_interaction)
-            .add_system(view::end_turn_btn_interaction)
-            .add_system(
-                view::clear_hand_and_play_area
-                    .after(view::hand_card_interaction)
-                    .after(view::end_turn_btn_interaction),
-            )
             .add_systems(
                 (
                     view::refresh_hand,
@@ -38,8 +31,10 @@ impl Plugin for GamePlugin {
                     view::refresh_resolve,
                     view::cleanup_dead_cards,
                 )
-                    .after(view::clear_hand_and_play_area),
+                    .before(view::hand_card_interaction),
             )
+            .add_system(view::hand_card_interaction)
+            .add_system(view::end_turn_btn_interaction)
             .add_system(dungeon_view::refresh_view)
             .add_system(dungeon_view::keyboard_input);
     }

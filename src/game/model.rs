@@ -122,12 +122,12 @@ impl CardGameModel {
     }
 
     fn tired(&mut self) {
-        // +1 to a demon's power
+        // +2 to a demon's power
         let roll = rand::thread_rng().gen_range(0..3);
         match roll {
-            0 => self.demons.fear.power += 1,
-            1 => self.demons.despair.power += 1,
-            2 => self.demons.despair.power += 1,
+            0 => self.demons.fear.power += 2,
+            1 => self.demons.despair.power += 2,
+            2 => self.demons.despair.power += 2,
             _ => println!("Tired card rng broke."),
         };
     }
