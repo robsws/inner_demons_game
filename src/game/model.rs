@@ -127,7 +127,7 @@ impl CardGameModel {
         match roll {
             0 => self.demons.fear.power += 2,
             1 => self.demons.despair.power += 2,
-            2 => self.demons.despair.power += 2,
+            2 => self.demons.doubt.power += 2,
             _ => println!("Tired card rng broke."),
         };
     }
@@ -189,7 +189,7 @@ impl CardGameModel {
 
     fn scared(&mut self) {
         // -5 Resolve, +1 to all demons' power
-        self.player_stats.resolve -= 10;
+        self.player_stats.resolve = self.player_stats.resolve.saturating_sub(5);
         self.demons.fear.power += 1;
         self.demons.despair.power += 1;
         self.demons.doubt.power += 1;
@@ -197,12 +197,12 @@ impl CardGameModel {
 
     fn hopeless(&mut self) {
         // -10 Resolve
-        self.player_stats.resolve -= 10;
+        self.player_stats.resolve = self.player_stats.resolve.saturating_sub(10);
     }
 
     fn shameful(&mut self) {
         // -1 Resolve, gain Shameful
-        self.player_stats.resolve -= 1;
+        self.player_stats.resolve = self.player_stats.resolve.saturating_sub(1);
         self.gain(CardKind::Shameful);
     }
 
@@ -226,7 +226,7 @@ impl CardGameModel {
         if fear_demon.stun_time > 0 {
             fear_demon.stun_time -= 1;
         } else if self.player_stats.bravery > 0 {
-            self.player_stats.bravery -= fear_demon.power;
+            self.player_stats.bravery = self.player_stats.bravery.saturating_sub(fear_demon.power);
         } else {
             self.gain(CardKind::Scared)
         }
@@ -235,7 +235,7 @@ impl CardGameModel {
         if despair_demon.stun_time > 0 {
             despair_demon.stun_time -= 1;
         } else if self.player_stats.hope > 0 {
-            self.player_stats.hope -= despair_demon.power;
+            self.player_stats.hope = self.player_stats.hope.saturating_sub(despair_demon.power);
         } else {
             self.gain(CardKind::Hopeless)
         }
@@ -244,7 +244,10 @@ impl CardGameModel {
         if doubt_demon.stun_time > 0 {
             doubt_demon.stun_time -= 1;
         } else if self.player_stats.confidence > 0 {
-            self.player_stats.confidence -= doubt_demon.power;
+            self.player_stats.confidence = self
+                .player_stats
+                .confidence
+                .saturating_sub(doubt_demon.power);
         } else {
             self.gain(CardKind::Shameful)
         }

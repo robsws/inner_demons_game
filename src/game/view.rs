@@ -139,6 +139,45 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let img_btn_end_turn_hover = asset_server.load("images/end_turn_btn_hover.png");
 
     // Add card text
+    let mut card_text = HashMap::new();
+    card_text.insert(
+        CardKind::Peaceful,
+        "+10 to either Bravery, Hope, or Confidence".to_string(),
+    );
+    card_text.insert(
+        CardKind::Tired,
+        "+2 power to either Fear, Despair, or Doubt inner demons".to_string(),
+    );
+    card_text.insert(CardKind::Stressed, "Gain a Tired card".to_string());
+    card_text.insert(
+        CardKind::Angry,
+        "+30 to hit. -30 to dodge. Gain a Tired card.".to_string(),
+    );
+    card_text.insert(CardKind::Inspired, "+1 Action".to_string());
+    card_text.insert(
+        CardKind::Satisfied,
+        "Discard a random card from your hand".to_string(),
+    );
+    card_text.insert(
+        CardKind::Proud,
+        "+10 to either Bravery, Hope, or Confidence, 3 times".to_string(),
+    );
+    card_text.insert(
+        CardKind::Determined,
+        "Stun a random demon for 3 turns".to_string(),
+    );
+    card_text.insert(CardKind::Dizzy, "Discard your deck".to_string());
+    card_text.insert(
+        CardKind::Scared,
+        "-5 Resolve. +1 to all inner demons' power.".to_string(),
+    );
+    card_text.insert(CardKind::Hopeless, "-10 Resolve".to_string());
+    card_text.insert(
+        CardKind::Shameful,
+        "-1 Resolve. Gain a Shameful card".to_string(),
+    );
+
+    commands.insert_resource(CardText { lookup: card_text });
 
     // Initialise card image handles
     let mut card_image_handles = HashMap::new();
@@ -992,28 +1031,59 @@ pub fn refresh_doubt(
 }
 
 pub fn hand_card_interaction(
+    mut commands: Commands,
     q_hand_area_children: Query<&Children, With<HandArea>>,
     mut q_interaction: Query<
-        (&Interaction, &mut UiImage, &Card),
+        (&Interaction, Entity, &mut UiImage, &Card),
         (Changed<Interaction>, With<Button>),
     >,
     mut game_model: ResMut<model::CardGameModel>,
     mut dungeon_model: ResMut<dungeon_model::DungeonGameModel>,
+    card_text: Res<CardText>,
+    font_handles: Res<FontHandles>,
 ) {
     let children_result = q_hand_area_children.get_single();
     match children_result {
         Ok(children) => {
             for &child in children.iter() {
                 match q_interaction.get_mut(child) {
-                    Ok((interaction, mut image, card)) => match *interaction {
+                    Ok((interaction, mut entity, mut image, card)) => match *interaction {
                         Interaction::Clicked => {
                             game_model.play(card.model.id, &mut dungeon_model);
+                            // Remove hover text
+                            commands.entity(entity).despawn_descendants();
                         }
                         Interaction::Hovered => {
                             image.texture = card.image_handles.hover.clone();
+                            // Add hover text
+                            commands.entity(entity).with_children(|parent| {
+                                parent.spawn(TextBundle {
+                                    text: Text::from_section(
+                                        card_text.lookup.get(&card.model.kind).unwrap(),
+                                        TextStyle {
+                                            font: font_handles.regular.clone(),
+                                            font_size: 20.0,
+                                            color: Color::BLACK,
+                                        },
+                                    ),
+                                    style: Style {
+                                        margin: UiRect {
+                                            left: Val::Px(2.0),
+                                            right: Val::Px(2.0),
+                                            top: Val::Px(2.0),
+                                            bottom: Val::Px(2.0),
+                                        },
+                                        max_size: Size::new(Val::Px(124.0), Val::Px(140.0)),
+                                        ..default()
+                                    },
+                                    ..default()
+                                });
+                            });
                         }
                         Interaction::None => {
                             image.texture = card.image_handles.face_up.clone();
+                            // Remove hover text
+                            commands.entity(entity).despawn_descendants();
                         }
                     },
                     _ => (),
