@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::camera::ScalingMode, utils::Duration};
 
-use super::dungeon_model;
 use super::dungeon_model::Coord;
+use super::{dungeon_model, model};
 
 #[derive(Component)]
 pub struct Canvas;
@@ -151,25 +151,26 @@ pub fn keyboard_input(
     time: Res<Time>,
     mut cooldown: ResMut<InputCooldown>,
     mut dungeon_model: ResMut<dungeon_model::DungeonGameModel>,
+    mut card_game_model: ResMut<model::CardGameModel>,
 ) {
     cooldown.timer.tick(time.delta());
     if !cooldown.timer.finished() {
         return;
     }
     if input.any_pressed([KeyCode::Up, KeyCode::W]) {
-        dungeon_model.move_player(dungeon_model::Direction::Up);
+        dungeon_model.move_player(dungeon_model::Direction::Up, &mut card_game_model);
         cooldown.timer.reset();
     }
     if input.any_pressed([KeyCode::Down, KeyCode::S]) {
-        dungeon_model.move_player(dungeon_model::Direction::Down);
+        dungeon_model.move_player(dungeon_model::Direction::Down, &mut card_game_model);
         cooldown.timer.reset();
     }
     if input.any_pressed([KeyCode::Right, KeyCode::D]) {
-        dungeon_model.move_player(dungeon_model::Direction::Right);
+        dungeon_model.move_player(dungeon_model::Direction::Right, &mut card_game_model);
         cooldown.timer.reset();
     }
     if input.any_pressed([KeyCode::Left, KeyCode::A]) {
-        dungeon_model.move_player(dungeon_model::Direction::Left);
+        dungeon_model.move_player(dungeon_model::Direction::Left, &mut card_game_model);
         cooldown.timer.reset();
     }
 }

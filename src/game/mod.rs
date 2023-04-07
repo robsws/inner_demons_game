@@ -35,6 +35,7 @@ impl Plugin for GamePlugin {
                     view::refresh_aim,
                     view::refresh_dodge,
                     view::refresh_moves_left,
+                    view::refresh_resolve,
                     view::cleanup_dead_cards,
                 )
                     .after(view::clear_hand_and_play_area),

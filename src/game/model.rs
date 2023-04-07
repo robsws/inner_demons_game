@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
+use rand::prelude::*;
+
+use super::dungeon_model;
 
 #[derive(Resource)]
 pub struct CardGameModel {
@@ -88,14 +89,14 @@ impl CardGameModel {
         self.next_card_id += 1;
     }
 
-    pub fn play(&mut self, card_id: u32) {
+    pub fn play(&mut self, card_id: u32, dmodel: &mut dungeon_model::DungeonGameModel) {
         let card_index = self.find_card_in_hand(card_id);
         let card = self.hand.remove(card_index);
         let card_kind = card.kind;
         self.in_play.push(card);
         match card_kind {
-            CardKind::Angry => self.angry(),
-            CardKind::Inspired => self.inspired(),
+            CardKind::Angry => self.angry(dmodel),
+            CardKind::Inspired => self.inspired(dmodel),
             CardKind::Tired => self.tired(),
             CardKind::Stressed => self.stressed(),
             CardKind::Satisfied => self.satisfied(),
@@ -109,46 +110,85 @@ impl CardGameModel {
         }
     }
 
-    fn inspired(&mut self) {
-        // Add a new random card to your deck
-    }
-
     fn peaceful(&mut self) {
-        // +5 to bravery, hope, or confidence
+        // +10 to random defensive trait
+        let roll = rand::thread_rng().gen_range(0..3);
+        match roll {
+            0 => self.player_stats.bravery += 10,
+            1 => self.player_stats.confidence += 10,
+            2 => self.player_stats.hope += 10,
+            _ => println!("Peaceful card rng broke."),
+        };
     }
 
     fn tired(&mut self) {
         // +1 to a demon's power
+        let roll = rand::thread_rng().gen_range(0..3);
+        match roll {
+            0 => self.demons.fear.power += 1,
+            1 => self.demons.despair.power += 1,
+            2 => self.demons.despair.power += 1,
+            _ => println!("Tired card rng broke."),
+        };
     }
 
     fn stressed(&mut self) {
+        // Gain one when hit by an enemy
         // Gain Tired
+        self.gain(CardKind::Tired);
     }
 
-    fn angry(&mut self) {
+    fn angry(&mut self, dmodel: &mut dungeon_model::DungeonGameModel) {
         // Gain one when hit by an enemy
-        // Stun a demon.
+        // +30 to hit
+        // -30 to dodge
+        // Gain Tired
+        dmodel.player_aim += 30;
+        dmodel.player_dodge -= 30;
+        self.gain(CardKind::Tired);
+    }
+
+    fn inspired(&mut self, dmodel: &mut dungeon_model::DungeonGameModel) {
+        // Gain three when picking up book
+        // +1 Action
+        dmodel.actions_left += 1;
     }
 
     fn satisfied(&mut self) {
         // Gain three when picking up food
-        // Discard a card and draw back to 5
+        // Discard a random card
+        let card_index = rand::thread_rng().gen_range(0..self.hand.len());
+        self.discard(self.hand[card_index].id);
     }
 
     fn proud(&mut self) {
-        // Multiply next card action by 3.
+        // Gain three when picking up treasure
+        // Acts like 3 peaceful.
+        for _ in 0..3 {
+            self.peaceful();
+        }
     }
 
     fn determined(&mut self) {
-        // Draw back up to 5 cards
+        // Gain when defeating an enemy
+        // Stun a demon
+        let roll = rand::thread_rng().gen_range(0..3);
+        match roll {
+            0 => self.demons.fear.stun_time = 3,
+            1 => self.demons.despair.stun_time = 3,
+            2 => self.demons.despair.stun_time = 3,
+            _ => println!("Determined card rng broke."),
+        };
     }
 
     fn dizzy(&mut self) {
+        // Gain when getting hit (random)
         // Discard your deck
+        self.discard_pile.append(&mut self.deck);
     }
 
     fn scared(&mut self) {
-        // -10 Resolve, +1 to all demons' power
+        // -5 Resolve, +1 to all demons' power
         self.player_stats.resolve -= 10;
         self.demons.fear.power += 1;
         self.demons.despair.power += 1;
@@ -156,13 +196,13 @@ impl CardGameModel {
     }
 
     fn hopeless(&mut self) {
-        // -20 Resolve
-        self.player_stats.resolve -= 20;
+        // -10 Resolve
+        self.player_stats.resolve -= 10;
     }
 
     fn shameful(&mut self) {
-        // -5 Resolve, gain Shameful
-        self.player_stats.resolve -= 5;
+        // -1 Resolve, gain Shameful
+        self.player_stats.resolve -= 1;
         self.gain(CardKind::Shameful);
     }
 
@@ -213,9 +253,6 @@ impl CardGameModel {
 
 pub fn setup(mut commands: Commands) {
     let card_game_model = CardGameModel::new(vec![
-        CardKind::Inspired,
-        CardKind::Inspired,
-        CardKind::Inspired,
         CardKind::Peaceful,
         CardKind::Peaceful,
         CardKind::Peaceful,
@@ -223,6 +260,9 @@ pub fn setup(mut commands: Commands) {
         CardKind::Peaceful,
         CardKind::Peaceful,
         CardKind::Peaceful,
+        CardKind::Tired,
+        CardKind::Tired,
+        CardKind::Tired,
     ]);
     commands.insert_resource(card_game_model);
 }

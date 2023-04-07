@@ -5,6 +5,8 @@ mod map;
 
 use map::Map;
 
+use super::model::{self, CardGameModel};
+
 #[derive(Resource)]
 pub struct DungeonGameModel {
     pub map: Map,
@@ -117,7 +119,7 @@ impl DungeonGameModel {
         enemies
     }
 
-    pub fn move_player(&mut self, dir: Direction) {
+    pub fn move_player(&mut self, dir: Direction, cmodel: &mut CardGameModel) {
         if self.actions_left == 0 {
             return;
         }
@@ -139,7 +141,7 @@ impl DungeonGameModel {
         // Check for enemies
         match self.enemies.iter().find(|e| !e.dead && e.pos == next_pos) {
             Some(enemy) => {
-                self.combat_enemy(enemy.id);
+                self.combat_enemy(enemy.id, cmodel);
                 return;
             }
             None => (),
@@ -150,31 +152,61 @@ impl DungeonGameModel {
             .iter()
             .find(|i| !i.collected && i.pos == next_pos)
         {
-            Some(item) => self.get_item(item.id),
+            Some(item) => self.get_item(item.id, cmodel),
             None => (),
         }
         // Move player
         self.player_pos = next_pos;
     }
 
-    fn combat_enemy(&mut self, enemy_id: u32) {
-        let enemy_hit_roll = rand::thread_rng().gen_range(0..100);
-        if enemy_hit_roll > self.player_dodge {
-            self.got_hit = true;
-        }
-
+    fn combat_enemy(&mut self, enemy_id: u32, cmodel: &mut CardGameModel) {
         let player_hit_roll = rand::thread_rng().gen_range(0..100);
         if player_hit_roll < self.player_aim {
             match self.enemies.iter_mut().find(|e| e.id == enemy_id) {
-                Some(enemy) => enemy.dead = true,
+                Some(enemy) => {
+                    enemy.dead = true;
+                    cmodel.gain(model::CardKind::Determined);
+                }
                 None => println!("Hit non existent enemy"),
+            }
+        }
+
+        let enemy_hit_roll = rand::thread_rng().gen_range(0..100);
+        if enemy_hit_roll > self.player_dodge {
+            self.got_hit = true;
+            // Gain a random negative card
+            let roll = rand::thread_rng().gen_range(0..3);
+            match roll {
+                0 => cmodel.gain(model::CardKind::Dizzy),
+                1 => cmodel.gain(model::CardKind::Stressed),
+                2 => cmodel.gain(model::CardKind::Angry),
+                _ => println!("Combat rng broke."),
             }
         }
     }
 
-    fn get_item(&mut self, item_id: u32) {
+    fn get_item(&mut self, item_id: u32, cmodel: &mut model::CardGameModel) {
         match self.items.iter_mut().find(|i| i.id == item_id) {
-            Some(item) => item.collected = true,
+            Some(item) => {
+                item.collected = true;
+                match item.kind {
+                    ItemKind::Book => {
+                        for _ in 0..3 {
+                            cmodel.gain(model::CardKind::Inspired);
+                        }
+                    }
+                    ItemKind::Chest => {
+                        for _ in 0..3 {
+                            cmodel.gain(model::CardKind::Proud);
+                        }
+                    }
+                    ItemKind::Food => {
+                        for _ in 0..3 {
+                            cmodel.gain(model::CardKind::Satisfied);
+                        }
+                    }
+                }
+            }
             None => println!("Collected non existent item"),
         }
     }
@@ -182,6 +214,8 @@ impl DungeonGameModel {
     pub fn end_turn(&mut self) {
         self.actions_left = self.turn_actions;
         self.got_hit = false;
+        self.player_aim = 40;
+        self.player_dodge = 40;
     }
 
     pub fn find_item_at_pos(&self, pos: &Coord) -> Option<&Item> {

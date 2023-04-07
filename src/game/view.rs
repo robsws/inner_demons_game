@@ -669,7 +669,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             // Resolve display
             root.spawn(NodeBundle {
                 style: Style {
-                    size: Size::height(Val::Px(40.0)),
+                    size: Size::height(Val::Px(30.0)),
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
@@ -693,7 +693,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                                 TextStyle {
                                     font: font_handles.regular.clone(),
                                     font_size: 24.0,
-                                    color: Color::CYAN,
+                                    color: Color::GREEN,
                                 },
                             ),
                         ]),
@@ -977,6 +977,7 @@ pub fn hand_card_interaction(
         (Changed<Interaction>, With<Button>),
     >,
     mut game_model: ResMut<model::CardGameModel>,
+    mut dungeon_model: ResMut<dungeon_model::DungeonGameModel>,
 ) {
     let children_result = q_hand_area_children.get_single();
     match children_result {
@@ -985,7 +986,7 @@ pub fn hand_card_interaction(
                 match q_interaction.get_mut(child) {
                     Ok((interaction, mut image, card)) => match *interaction {
                         Interaction::Clicked => {
-                            game_model.play(card.model.id);
+                            game_model.play(card.model.id, &mut dungeon_model);
                         }
                         Interaction::Hovered => image.texture = card.image_handles.hover.clone(),
                         Interaction::None => image.texture = card.image_handles.face_up.clone(),
