@@ -12,6 +12,8 @@ pub struct CardGameModel {
     pub hand: Vec<Card>,
     pub in_play: Vec<Card>,
     next_card_id: u32,
+    pub game_over: bool,
+    pub win: bool,
 }
 
 impl CardGameModel {
@@ -46,6 +48,8 @@ impl CardGameModel {
             hand: Vec::new(),
             in_play: Vec::new(),
             next_card_id: starter_cards.len() as u32,
+            game_over: false,
+            win: false,
         };
         card_game_model.deck.shuffle(&mut thread_rng());
         for _ in 0..5 {
@@ -193,17 +197,26 @@ impl CardGameModel {
         self.demons.fear.power += 1;
         self.demons.despair.power += 1;
         self.demons.doubt.power += 1;
+        self.check_game_over();
     }
 
     fn hopeless(&mut self) {
         // -10 Resolve
         self.player_stats.resolve = self.player_stats.resolve.saturating_sub(10);
+        self.check_game_over();
     }
 
     fn shameful(&mut self) {
         // -1 Resolve, gain Shameful
         self.player_stats.resolve = self.player_stats.resolve.saturating_sub(1);
         self.gain(CardKind::Shameful);
+        self.check_game_over();
+    }
+
+    fn check_game_over(&mut self) {
+        if self.player_stats.resolve == 0 {
+            self.game_over = true;
+        }
     }
 
     pub fn end_turn(&mut self) {

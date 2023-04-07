@@ -3,3 +3,7 @@
 /.DS_Store
 /assets/.DS_Store
 /builds/
+/assets/images/GameOver.jpg
+/assets/images/InnerDemons.jpg
+/assets/images/*.jpg
+*.DS_Store

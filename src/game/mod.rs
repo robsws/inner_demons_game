@@ -13,6 +13,7 @@ impl Plugin for GamePlugin {
             .add_startup_system(dungeon_model::setup)
             .add_startup_system(view::setup)
             .add_startup_system(dungeon_view::setup)
+            .add_system(view::check_game_end)
             .add_systems(
                 (
                     view::refresh_hand,

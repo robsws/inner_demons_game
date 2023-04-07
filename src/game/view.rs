@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use super::{
     dungeon_model,
-    model::{self, CardKind},
+    model::{self, CardGameModel, CardKind},
 };
 
 #[derive(Resource, Clone)]
@@ -42,6 +42,9 @@ struct CardImageHandles {
     face_up: Handle<Image>,
     hover: Handle<Image>,
 }
+
+#[derive(Component)]
+pub struct UiRoot;
 
 #[derive(Component)]
 pub struct DeckArea;
@@ -750,7 +753,8 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     })
                     .insert(ResolveValue);
             });
-        });
+        })
+        .insert(UiRoot);
 }
 
 fn create_card(card_model: model::Card, image_handles: &ImageHandles) -> CardBundle {
@@ -781,13 +785,95 @@ fn create_card(card_model: model::Card, image_handles: &ImageHandles) -> CardBun
     }
 }
 
-pub fn clear_hand_and_play_area(
+pub fn check_game_end(
     mut commands: Commands,
-    mut q_hand_area: Query<Entity, With<HandArea>>,
-    mut q_play_area: Query<Entity, With<PlayArea>>,
+    model: Res<CardGameModel>,
+    mut q_ui_root: Query<(Entity, &mut Style, &mut BackgroundColor), With<UiRoot>>,
+    font_handles: Res<FontHandles>,
+    asset_server: Res<AssetServer>,
 ) {
-    commands.entity(q_hand_area.single_mut()).clear_children();
-    commands.entity(q_play_area.single_mut()).clear_children();
+    if model.game_over {
+        let (mut ui_root, mut ui_root_style, mut ui_root_bg) = q_ui_root.single_mut();
+        commands.entity(ui_root).despawn_descendants();
+        ui_root_style.justify_content = JustifyContent::Center;
+        ui_root_bg.0 = Color::BLACK;
+
+        commands.entity(ui_root).with_children(|parent| {
+            parent
+                .spawn(ImageBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Column,
+                        justify_content: JustifyContent::Center,
+                        align_content: AlignContent::Center,
+                        min_size: Size::height(Val::Px(600.0)),
+                        max_size: Size::height(Val::Px(600.0)),
+                        ..default()
+                    },
+                    image: UiImage {
+                        texture: asset_server.load("images/GameOver.png"),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    parent.spawn(TextBundle {
+                        text: Text::from_section(
+                            "          You succumbed to your inner demons.",
+                            TextStyle {
+                                font: font_handles.regular.clone(),
+                                font_size: 60.0,
+                                color: Color::WHITE,
+                            },
+                        ),
+                        ..default()
+                    });
+                });
+        });
+    } else if model.win {
+        let (mut ui_root, mut ui_root_style, mut ui_root_bg) = q_ui_root.single_mut();
+        commands.entity(ui_root).despawn_descendants();
+        ui_root_style.justify_content = JustifyContent::Center;
+        ui_root_bg.0 = Color::BLACK;
+
+        commands.entity(ui_root).with_children(|parent| {
+            parent
+                .spawn(ImageBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Column,
+                        justify_content: JustifyContent::End,
+                        align_content: AlignContent::Center,
+                        min_size: Size::height(Val::Px(600.0)),
+                        max_size: Size::height(Val::Px(600.0)),
+                        ..default()
+                    },
+                    image: UiImage {
+                        texture: asset_server.load("images/Win.png"),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|parent| {
+                    parent.spawn(TextBundle {
+                        style: Style {
+                            margin: UiRect {
+                                bottom: Val::Px(10.0),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        text: Text::from_section(
+                            "    You escaped with your life, and your sanity.",
+                            TextStyle {
+                                font: font_handles.regular.clone(),
+                                font_size: 60.0,
+                                color: Color::CYAN,
+                            },
+                        ),
+                        ..default()
+                    });
+                });
+        });
+    }
 }
 
 pub fn refresh_hand(
@@ -797,6 +883,9 @@ pub fn refresh_hand(
     image_handles: Res<ImageHandles>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     // Catalog the card objects that already exist in the scene
     // to avoid despawning and creating them every frame
     let mut visible_cards: HashMap<u32, (Entity, Entity)> = HashMap::new();
@@ -835,6 +924,9 @@ pub fn refresh_play_area(
     image_handles: Res<ImageHandles>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     // Catalog the card objects that already exist in the scene
     // to avoid despawning and creating them every frame
     let mut visible_cards: HashMap<u32, Entity> = HashMap::new();
@@ -876,6 +968,9 @@ pub fn refresh_deck(
     mut q_deck_top_visibility: Query<&mut Visibility, With<DeckTop>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     // Update the deck
     let mut deck_top_visibility = q_deck_top_visibility.single_mut();
     if game_model.deck.is_empty() {
@@ -890,6 +985,9 @@ pub fn refresh_discard_pile(
     image_handles: Res<ImageHandles>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     // Update the discard pile
     let (mut disc_top_visibility, mut disc_top_image) = q_disc_top.single_mut();
     if game_model.discard_pile.is_empty() {
@@ -913,6 +1011,9 @@ pub fn cleanup_dead_cards(
     game_model: Res<model::CardGameModel>,
     q_cards: Query<(Entity, &Card, &mut UiImage)>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     // Clean up cards in either the deck or discard pile
     for (card_entity, card, _) in q_cards.iter() {
         if game_model
@@ -935,6 +1036,9 @@ pub fn refresh_bravery(
     mut q_bravery_val: Query<&mut Text, With<BraveryValue>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     // Update the HUD
     let mut bravery_ui = q_bravery_val.single_mut();
     bravery_ui.sections[1].value = game_model.player_stats.bravery.to_string();
@@ -944,6 +1048,9 @@ pub fn refresh_hope(
     mut q_hope_val: Query<&mut Text, With<HopeValue>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let mut hope_ui = q_hope_val.single_mut();
     hope_ui.sections[1].value = game_model.player_stats.hope.to_string();
 }
@@ -952,6 +1059,9 @@ pub fn refresh_confidence(
     mut q_confidence_val: Query<&mut Text, With<ConfidenceValue>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let mut confidence_ui = q_confidence_val.single_mut();
     confidence_ui.sections[1].value = game_model.player_stats.confidence.to_string();
 }
@@ -959,7 +1069,11 @@ pub fn refresh_confidence(
 pub fn refresh_moves_left(
     mut q_moves_left_val: Query<&mut Text, With<MovesLeftValue>>,
     game_model: Res<dungeon_model::DungeonGameModel>,
+    card_game_model: Res<model::CardGameModel>,
 ) {
+    if card_game_model.win || card_game_model.game_over {
+        return;
+    }
     let mut moves_left_ui = q_moves_left_val.single_mut();
     moves_left_ui.sections[1].value = game_model.actions_left.to_string();
 }
@@ -967,7 +1081,11 @@ pub fn refresh_moves_left(
 pub fn refresh_aim(
     mut q_aim_val: Query<&mut Text, With<AimValue>>,
     game_model: Res<dungeon_model::DungeonGameModel>,
+    card_game_model: Res<model::CardGameModel>,
 ) {
+    if card_game_model.win || card_game_model.game_over {
+        return;
+    }
     let mut aim_ui = q_aim_val.single_mut();
     aim_ui.sections[1].value = game_model.player_aim.to_string();
 }
@@ -975,7 +1093,11 @@ pub fn refresh_aim(
 pub fn refresh_dodge(
     mut q_dodge_val: Query<&mut Text, With<DodgeValue>>,
     game_model: Res<dungeon_model::DungeonGameModel>,
+    card_game_model: Res<model::CardGameModel>,
 ) {
+    if card_game_model.win || card_game_model.game_over {
+        return;
+    }
     let mut dodge_ui = q_dodge_val.single_mut();
     dodge_ui.sections[1].value = game_model.player_dodge.to_string();
 }
@@ -984,6 +1106,9 @@ pub fn refresh_resolve(
     mut q_resolve_val: Query<&mut Text, With<ResolveValue>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let mut resolve_ui = q_resolve_val.single_mut();
     resolve_ui.sections[1].value = game_model.player_stats.resolve.to_string();
 }
@@ -992,6 +1117,9 @@ pub fn refresh_fear(
     mut q_fear_val: Query<&mut Text, With<FearPower>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let mut fear_ui = q_fear_val.single_mut();
     if game_model.demons.fear.stun_time > 0 {
         fear_ui.sections[0].value = "STUNNED: ".to_string();
@@ -1006,6 +1134,9 @@ pub fn refresh_despair(
     mut q_despair_val: Query<&mut Text, With<DespairPower>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let mut despair_ui = q_despair_val.single_mut();
     if game_model.demons.despair.stun_time > 0 {
         despair_ui.sections[0].value = "STUNNED: ".to_string();
@@ -1020,6 +1151,9 @@ pub fn refresh_doubt(
     mut q_doubt_val: Query<&mut Text, With<DoubtPower>>,
     game_model: Res<model::CardGameModel>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let mut doubt_ui = q_doubt_val.single_mut();
     if game_model.demons.doubt.stun_time > 0 {
         doubt_ui.sections[0].value = "STUNNED: ".to_string();
@@ -1042,6 +1176,9 @@ pub fn hand_card_interaction(
     card_text: Res<CardText>,
     font_handles: Res<FontHandles>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     let children_result = q_hand_area_children.get_single();
     match children_result {
         Ok(children) => {
@@ -1103,6 +1240,9 @@ pub fn end_turn_btn_interaction(
     mut dungeon_model: ResMut<dungeon_model::DungeonGameModel>,
     image_handles: Res<ImageHandles>,
 ) {
+    if game_model.win || game_model.game_over {
+        return;
+    }
     for (interaction, mut image) in &mut q_interaction {
         match *interaction {
             Interaction::Clicked => {

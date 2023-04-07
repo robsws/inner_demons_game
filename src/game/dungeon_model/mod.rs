@@ -157,6 +157,10 @@ impl DungeonGameModel {
         }
         // Move player
         self.player_pos = next_pos;
+        // Check for win
+        if self.player_pos.1 <= 7 {
+            cmodel.win = true;
+        }
     }
 
     fn combat_enemy(&mut self, enemy_id: u32, cmodel: &mut CardGameModel) {
